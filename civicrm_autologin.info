@@ -1,0 +1,6 @@
+name = civicrm_autologin
+description = Auto_login_url tokens in Civicrm
+core = 7.x
+package = Civicrm autologin
+
+

@@ -1,0 +1,67 @@
+ <?php
+
+function civicrm_autologin_civicrm_tokens(&$tokens) {
+   $tokens['username'] = array(
+      'username.drupal' => 'Drupal username'
+   );
+  
+   $config = CRM_Core_Config::singleton();
+   if ($config->userSystem->is_drupal) {
+      if (function_exists("module_exists") && module_exists("auto_login_url")) {
+         $list_tokens = array ();
+         $list_tokens['autologin.front'] = 'Autologin to front page :: Autologin';
+        
+         $dsql = "SELECT cforms.nid, node.title FROM {webform_civicrm_forms} cforms
+        JOIN {node} node ON cforms.nid = node.nid AND node.status = 1 order by node.title";
+        
+         $dq_result = db_query($dsql);
+        
+         foreach ($dq_result as $record) {
+            $list_tokens["autologin.$record->nid"] = "$record->title (nid: $record->nid) :: Autologin Webforms";
+         }
+         $tokens['autologin'] = $list_tokens;
+      }
+   }
+  
+}
+
+function civicrm_autologin_civicrm_tokenValues(&$values, $cids, $job = null, $tokens = array(), $context = null) {
+   // Debug tokens
+   // dd($tokens, "tokenValues : tokens");
+   // dd($values, "tokenValues : values");
+   // dd($cids, "tokenValues : cids");
+   // dd($job, "tokenValues : job");
+   // dd($context, "tokenValues : context");
+  
+   if (!empty($tokens['autologin'])) {
+      // dd($tokens['autologin'], "Autologin");
+      civicrm_initialize();
+      foreach ($cids as $cid) {
+         $params = array(
+            'version' => 3,
+            'sequential' => 1,
+            'contact_id' => $cid
+         );
+         $result = civicrm_api('UFMatch', 'get', $params);
+         // dd($result, "tokenValues : result");
+         if (!$result['is_error']) {
+            $drupalinfo = user_load($result['values'][0]['uf_id']);
+            // dd($drupalinfo, "tokenValues : drupalinfo");
+            foreach (array_keys ($tokens['autologin']) as $nid) {
+              if ($nid == 'front') {
+                $url='/';
+              }
+              else {
+                $url = "node/$nid";
+              }
+              // dd($nid, "tokenValues : nid");
+              $values[$cid]['autologin.'.$nid] = auto_login_url_create($drupalinfo->uid, $url, TRUE);
+              // dd($values, "tokenValues : values_2");
+            }
+         }
+      }
+   }
+  
+}
+?>
+
