@@ -1,41 +1,159 @@
- <?php
+<?php
+/**
+ * Implements hook_menu().
+ */
+function civicrm_autologin_menu() {
+
+   $items = array();
+
+   // Root URL of settings page.
+   $items['admin/config/civicrm/autologin'] = array(
+      'title' => 'Civicrm Auto Login URL settings',
+      'description' => 'Settings page for Civicrm Auto Login URL',
+      'page callback' => 'drupal_get_form',
+      'page arguments' => array(
+         '_civicrm_autologin_settings'
+      ) ,
+      'access arguments' => array(
+         'administer civicrm auto login url'
+      ) ,
+   );
+
+   // Default tab.
+   $items['admin/config/civicrm/autologin/settings'] = array(
+      'title' => 'Civicrm Auto Login URL settings',
+      'type' => MENU_DEFAULT_LOCAL_TASK,
+      'weight' => - 10
+   );
+
+   return $items;
+}
+
+/**
+ * Settings form for Civicrm Auto Login URL.
+ *
+ * @return object
+ *   Form object.
+ */
+function _civicrm_autologin_settings() {
+   $form = array();
+
+   $form['civicrm_autologin_entities'] = array(
+      '#type' => 'fieldset',
+      '#title' => t('Entité a présenter') ,
+      '#description' => t('Entités a présenter') ,
+   );
+
+   $form['civicrm_autologin_entities']['civicrm_autolgin_webforms'] = array(
+      '#type' => 'checkbox',
+      '#title' => t('Webforms.') ,
+      '#default_value' => variable_get('civicrm_autolgin_webforms', true) ,
+   );
+
+   $form['civicrm_autologin_entities']['civicrm_autolgin_views'] = array(
+      '#type' => 'checkbox',
+      '#title' => t('Views.') ,
+      '#default_value' => variable_get('civicrm_autolgin_views', true) ,
+   );
+
+   $form['civicrm_autologin_url'] = array(
+      '#type' => 'fieldset',
+      '#title' => t('Format de l\'URL') ,
+      '#description' => t('Format de l\'URL') ,
+   );
+
+   $form['civicrm_autologin_url']['civicrm_autolgin_absurl'] = array(
+      '#type' => 'checkbox',
+      '#title' => t('Absolue.') ,
+      '#default_value' => variable_get('civicrm_autolgin_absurl', false) ,
+      '#description' => t('Absolue: inclu l\'adresse du site. Sinon, fournit juste le chemin de la page') ,
+   );
+
+   $form['civicrm_autologin_trace'] = array(
+      '#type' => 'fieldset',
+      '#title' => t('Trace') ,
+      '#description' => t('Log des operations.') ,
+   );
+
+   $form['civicrm_autologin_trace']['civicrm_autolgin_trace'] = array(
+      '#type' => 'checkbox',
+      '#title' => t('Log la créationdes URLS.') ,
+      '#default_value' => variable_get('civicrm_autolgin_trace', false) ,
+      '#description' => t('Log en base les URLS créées') ,
+   );
+
+   $form['civicrm_autologin_trace']['civicrm_autolgin_debug'] = array(
+      '#type' => 'checkbox',
+      '#title' => t('Debug.') ,
+      '#default_value' => variable_get('civicrm_autolgin_debug', false) ,
+      '#description' => t('Log en base des informations de debug') ,
+   );
+
+   $form = system_settings_form($form);
+   $form['#submit'][] = '_civicrm_autologin_settings_submit';
+
+   return $form;
+}
+
+/**
+ * Submit handler for the admin settings form.
+ */
+function _civicrm_autologin_settings_submit($form, &$form_state) {
+   // Reload hook_menu cache.
+   menu_rebuild();
+}
 
 function civicrm_autologin_civicrm_tokens(&$tokens) {
    $tokens['username'] = array(
       'username.drupal' => 'Drupal username'
    );
-  
+
    $config = CRM_Core_Config::singleton();
-   if ($config->userSystem->is_drupal) {
+   if ($config
+      ->userSystem
+      ->is_drupal) {
       if (function_exists("module_exists") && module_exists("auto_login_url")) {
-         $list_tokens = array ();
-         $list_tokens['autologin.front'] = 'Autologin to front page :: Autologin';
-        
+         $list_tokens = array();
+         $list_tokens['autologin.page_front'] = 'Autologin to front page :: Autologin';
+         $list_tokens['autologin.base_site'] = 'Site to connect to :: Autologin';
+
          $dsql = "SELECT cforms.nid, node.title FROM {webform_civicrm_forms} cforms
         JOIN {node} node ON cforms.nid = node.nid AND node.status = 1 order by node.title";
-        
+
          $dq_result = db_query($dsql);
-        
+
          foreach ($dq_result as $record) {
-            $list_tokens["autologin.$record->nid"] = "$record->title (nid: $record->nid) :: Autologin Webforms";
+            $list_tokens["autologin.webform_$record->nid"] = "$record->title (nid: $record->nid) :: Autologin Webforms";
+            $list_tokens["autologin.submission_$record->nid"] = "Sub $record->title (nid: $record->nid) :: Autologin Webforms Submission";
+
          }
          $tokens['autologin'] = $list_tokens;
       }
    }
-  
+
 }
 
-function civicrm_autologin_civicrm_tokenValues(&$values, $cids, $job = null, $tokens = array(), $context = null) {
-   // Debug tokens
-   // dd($tokens, "tokenValues : tokens");
-   // dd($values, "tokenValues : values");
-   // dd($cids, "tokenValues : cids");
-   // dd($job, "tokenValues : job");
-   // dd($context, "tokenValues : context");
-  
+function civicrm_autologin_civicrm_tokenValues(&$values, $cids, $job = null, $tokens = array() , $context = null) {
+   $debug = variable_get('civicrm_autolgin_debug', false);
+   if ($debug) {
+      watchdog('civicrm_autologin_tokenValues', 'values: @values, cids: @cids, tokens: @tokens, job: @job, context: @context', array(
+         '@values' => print_r($values, true) ,
+         '@cids' => print_r($cids, true) ,
+         '@tokens' => print_r($tokens, true) ,
+         '@job' => print_r($job, true) ,
+         '@context' => print_r($context, true)
+      ));
+   }
+
    if (!empty($tokens['autologin'])) {
-      // dd($tokens['autologin'], "Autologin");
       civicrm_initialize();
+      global $base_url;
+      // base_url peut contenir un chemin, en particulier les batchs Civicrm
+      $r = parse_url($base_url);
+      // recontruit juste l'URL du site
+      $site_url = $r['scheme'] . '://' . $r['host'] . (!empty($r['port']) ? ':'.$r['port'] : '');
+      $trace = variable_get('civicrm_autolgin_trace', false);
+
       foreach ($cids as $cid) {
          $params = array(
             'version' => 3,
@@ -43,25 +161,97 @@ function civicrm_autologin_civicrm_tokenValues(&$values, $cids, $job = null, $to
             'contact_id' => $cid
          );
          $result = civicrm_api('UFMatch', 'get', $params);
-         // dd($result, "tokenValues : result");
-         if (!$result['is_error']) {
+         if (!$result['is_error'] && isset($result['values'][0]['uf_id'])) {
             $drupalinfo = user_load($result['values'][0]['uf_id']);
-            // dd($drupalinfo, "tokenValues : drupalinfo");
-            foreach (array_keys ($tokens['autologin']) as $nid) {
-              if ($nid == 'front') {
-                $url='/';
-              }
-              else {
-                $url = "node/$nid";
-              }
-              // dd($nid, "tokenValues : nid");
-              $values[$cid]['autologin.'.$nid] = auto_login_url_create($drupalinfo->uid, $url, TRUE);
-              // dd($values, "tokenValues : values_2");
+            if ($debug) {
+               watchdog('civicrm_autologin(0)', 'values: @values, cids: @cids, cid: @cid, tokens: @tokens, params: @params, result: @result, drupalinfo: @drupalinfo ', array(
+                  '@values' => print_r($values, true) ,
+                  '@cids' => print_r($cids, true) ,
+                  '@cid' => print_r($cid, true) ,
+                  '@tokens' => print_r($tokens, true) ,
+                  '@params' => print_r($params, true) ,
+                  '@result' => print_r($result, true) ,
+                  '@drupalinfo' => print_r($drupalinfo, true)
+               ));
+            }
+            foreach ($tokens['autologin'] as $tmp_key => $cur_token_raw) {
+               $url = '';
+               // CiviCRM is buggy here, if token is being used in CiviMail, we need to use the key
+               // as the token. Otherwise ( PDF Letter, one-off email, etc) we
+               // need to use the value.
+               // Thanks to  sgladstone for her comments in fancytoken code !!!
+               $cur_token = '';
+               if (is_numeric($tmp_key)) {
+                  $cur_token = $cur_token_raw;
+               }
+               else {
+                  // Its being used by CiviMail.
+                  $cur_token = $tmp_key;
+               }
+               $token_to_fill = 'autologin.' . $cur_token;
+
+               $token_array = explode('_', $cur_token);
+               if ($debug) {
+                  watchdog('civicrm_autologin(1)', 'values: @values, cid: @cid, cur_token_raw: @cur_token_raw, token_to_fill: @token_to_fill, tmp_key: @tmp_key', array(
+                     '@values' => print_r($values, true) ,
+                     '@cid' => print_r($cid, true) ,
+                     '@cur_token_raw' => print_r($cur_token_raw, true) ,
+                     '@token_to_fill' => print_r($token_to_fill, true) ,
+                     '@tmp_key' => print_r($tmp_key, true)
+                  ));
+               }
+
+               $nid = $token_array[1];
+               if ($nid == 'front') {
+                  $url = '/';
+               }
+               else if ($nid == 'site') {
+                  $values[$cid][$token_to_fill] = $site_url . '/';
+                  continue;
+               }
+               else if ($token_array[0] == 'webform') {
+                  $url = "node/$nid";
+               }
+               else if ($token_array[0] == 'submission') {
+                  $ssql = "SELECT sforms.sid FROM {webform_submissions} sforms where sforms.nid = $nid and 
+                     sforms.uid = $drupalinfo->uid order by sid desc limit 1";
+
+                  $sq_result = db_query($ssql);
+                  $sid = $sq_result->fetchField();
+                  $url = "node/$nid/submission/$sid/edit";
+                  if ($debug) {
+                     watchdog('civicrm_autologin_submission', 'sid: @sid, nid: @nid, ssql: @ssql', array(
+                        '@sid' => print_r($sid, true) ,
+                        '@nid' => print_r($nid, true) ,
+                        '@ssql' => print_r($ssql, true)
+                     ));
+                  }
+
+               }
+               else {
+                 // Unknonw token !!!
+                 continue;
+               }
+
+               $values[$cid][$token_to_fill] = auto_login_url_create($drupalinfo->uid, $url, false);
+
+               if (variable_get('civicrm_autolgin_absurl')) {
+                  $values[$cid][$token_to_fill] = $site_url . '/' . $values[$cid][$token_to_fill];
+               }
+
+               if ($trace) {
+                  watchdog('civicrm_autologin', 'nid: @nid, cid: @cid, val: @val, url: @url, cur_token_raw: @cur_token_raw ', array(
+                     '@nid' => $nid,
+                     '@cid' => $cid,
+                     '@val' => $values[$cid][$token_to_fill],
+                     '@url' => $url,
+                     '@cur_token_raw' => $cur_token_raw
+                  ));
+               }
             }
          }
       }
    }
-  
+
 }
 ?>
-
