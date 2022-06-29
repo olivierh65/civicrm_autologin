@@ -239,16 +239,24 @@ function civicrm_autologin_civicrm_tokenValues(&$values, $cids, $job = null, $to
          $result = civicrm_api('UFMatch', 'get', $params);
          if (!$result['is_error'] && isset($result['values'][0]['uf_id'])) {
             $drupalinfo = \Drupal::entityTypeManager()->getStorage('user')->load($result['values'][0]['uf_id']);
+
             if ($debug) {
-               \Drupal::logger('civicrm_autologin(0)')->notice('values: @values, cids: @cids, cid: @cid, tokens: @tokens, params: @params, result: @result, drupal id: @drupalinfo ', array(
+               \Drupal::logger('civicrm_autologin(0)')->notice('values: @values, cid: @cid, tokens: @tokens, params: @params, result: @result, drupal id: @drupalinfo ', array(
                   '@values' => print_r($values, true) ,
-                  '@cids' => print_r($cids, true) ,
                   '@cid' => print_r($cid, true) ,
                   '@tokens' => print_r($tokens, true) ,
                   '@params' => print_r($params, true) ,
                   '@result' => print_r($result, true) ,
                   '@drupalinfo' => $drupalinfo->id()
                ));
+            }
+
+            # uf_id does not exist
+            if ($drupalinfo === null) {
+               \Drupal::logger('civicrm_autologin')->error("Contact_id " . $cid . ", uf_id " . $result['values'][0]['uf_id'] . " don't exist. Mail not send");
+               # Remove this from mailing
+               unset($values[$cid]);
+               continue;
             }
             foreach (preg_grep('(aluc|username)', array_keys($tokens)) as $tok_key) {
                foreach ($tokens[$tok_key] as $tmp_key => $cur_token_raw) {
