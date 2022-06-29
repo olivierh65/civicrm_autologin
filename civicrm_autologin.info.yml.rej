@@ -1,0 +1,10 @@
+--- web/modules/custom/civicrm_autologin/civicrm_autologin.info.yml	2021-12-20 18:42:59.775430103 +0100
++++ custom/civicrm_autologin/civicrm_autologin.info.yml	2021-12-15 22:08:01.854691303 +0100
+@@ -1,7 +1,6 @@
+ name: civicrm_autologin
+ description: 'Auto_login_url tokens in Civicrm'
+ core: 8.x
+-core_version_requirement: ^8 || ^9
+ package: 'Civicrm autologin'
+ dependencies:
+   auto_login_url: 'drupal:auto_login_url'

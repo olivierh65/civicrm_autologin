@@ -1,0 +1,18 @@
+system.admin_config_myconfig:
+  path: '/admin/config/mysite'
+  defaults:
+    _controller: '\Drupal\system\Controller\SystemController::systemAdminMenuBlockPage'
+    _title: 'Mysite'
+  requirements:
+    _permission: 'access administration pages'
+    
+civicrm_autologin.settings:
+  path: /admin/config/civicrm/autologin
+  defaults:
+    _title: 'Civicrm Auto Login URL settings'
+    _form: \Drupal\civicrm_autologin\Form\CivicrmAutologinSettings
+  requirements:
+    _permission: 'access administration pages'
+  options:
+    _admin_route: TRUE
+

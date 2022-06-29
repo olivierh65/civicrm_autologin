@@ -1,0 +1,5 @@
+civicrm_autologin_settings:
+  version: 1.x
+  css:
+    theme:
+      css/civicrm_autologin_settings.css: {}

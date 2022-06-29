@@ -1,0 +1,5 @@
+civicrm_autologin.settings:
+  route_name: civicrm_autologin.settings
+  title: 'Civicrm Auto Login URL settings'
+  weight: -10
+  base_route: civicrm_autologin.settings

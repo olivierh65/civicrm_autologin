@@ -3,4 +3,6 @@ description = Auto_login_url tokens in Civicrm
 core = 7.x
 package = Civicrm autologin
 
+project = civicrm_autologin
+dependencies[] = auto_login_url
 

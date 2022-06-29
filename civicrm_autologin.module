@@ -12,7 +12,7 @@ function civicrm_autologin_menu() {
       'description' => 'Settings page for Civicrm Auto Login URL',
       'page callback' => 'drupal_get_form',
       'page arguments' => array(
-         '_civicrm_autologin_settings'
+         'civicrm_autologin_settings'
       ) ,
       'access arguments' => array(
          'administer civicrm auto login url'
@@ -35,8 +35,9 @@ function civicrm_autologin_menu() {
  * @return object
  *   Form object.
  */
-function _civicrm_autologin_settings() {
+function civicrm_autologin_settings() {
    $form = array();
+   $config = $this->config('civicrm_autologin.settings');
 
    $form['civicrm_autologin_entities'] = array(
       '#type' => 'fieldset',
@@ -44,17 +45,19 @@ function _civicrm_autologin_settings() {
       '#description' => t('Entités a présenter') ,
    );
 
-   $form['civicrm_autologin_entities']['civicrm_autolgin_webforms'] = array(
+$form['civicrm_autologin_entities']['civicrm_autolgin_webforms'] = array(
       '#type' => 'checkbox',
       '#title' => t('Webforms.') ,
-      '#default_value' => variable_get('civicrm_autolgin_webforms', true) ,
+      '#default_value' => $config->get('civicrm_autolgin_webforms') ,
    );
 
-   $form['civicrm_autologin_entities']['civicrm_autolgin_views'] = array(
+
+$form['civicrm_autologin_entities']['civicrm_autolgin_views'] = array(
       '#type' => 'checkbox',
       '#title' => t('Views.') ,
-      '#default_value' => variable_get('civicrm_autolgin_views', true) ,
+      '#default_value' => $config->get('civicrm_autolgin_views') ,
    );
+
 
    $form['civicrm_autologin_url'] = array(
       '#type' => 'fieldset',
@@ -62,12 +65,14 @@ function _civicrm_autologin_settings() {
       '#description' => t('Format de l\'URL') ,
    );
 
-   $form['civicrm_autologin_url']['civicrm_autolgin_absurl'] = array(
+
+$form['civicrm_autologin_url']['civicrm_autolgin_absurl'] = array(
       '#type' => 'checkbox',
       '#title' => t('Absolue.') ,
-      '#default_value' => variable_get('civicrm_autolgin_absurl', false) ,
+      '#default_value' => $config->get('civicrm_autolgin_absurl') ,
       '#description' => t('Absolue: inclu l\'adresse du site. Sinon, fournit juste le chemin de la page') ,
    );
+
 
    $form['civicrm_autologin_trace'] = array(
       '#type' => 'fieldset',
@@ -75,22 +80,25 @@ function _civicrm_autologin_settings() {
       '#description' => t('Log des operations.') ,
    );
 
-   $form['civicrm_autologin_trace']['civicrm_autolgin_trace'] = array(
+
+$form['civicrm_autologin_trace']['civicrm_autolgin_trace'] = array(
       '#type' => 'checkbox',
       '#title' => t('Log la créationdes URLS.') ,
-      '#default_value' => variable_get('civicrm_autolgin_trace', false) ,
+      '#default_value' => $config->get('civicrm_autolgin_trace') ,
       '#description' => t('Log en base les URLS créées') ,
    );
 
-   $form['civicrm_autologin_trace']['civicrm_autolgin_debug'] = array(
+
+$form['civicrm_autologin_trace']['civicrm_autolgin_debug'] = array(
       '#type' => 'checkbox',
       '#title' => t('Debug.') ,
-      '#default_value' => variable_get('civicrm_autolgin_debug', false) ,
+      '#default_value' => $config->get('civicrm_autolgin_debug') ,
       '#description' => t('Log en base des informations de debug') ,
    );
 
+
    $form = system_settings_form($form);
-   $form['#submit'][] = '_civicrm_autologin_settings_submit';
+   $form['#submit'][] = 'civicrm_autologin_settings_submit';
 
    return $form;
 }
@@ -98,45 +106,110 @@ function _civicrm_autologin_settings() {
 /**
  * Submit handler for the admin settings form.
  */
-function _civicrm_autologin_settings_submit($form, &$form_state) {
+function civicrm_autologin_settings_submit($form, &$form_state) {
    // Reload hook_menu cache.
-   menu_rebuild();
+   \Drupal::service('router.builder')->rebuild();
 }
 
 function civicrm_autologin_civicrm_tokens(&$tokens) {
    $tokens['username'] = array(
       'username.drupal' => 'Drupal username'
    );
+   $config = \Drupal::config('civicrm_autologin.settings');
 
-   $config = CRM_Core_Config::singleton();
-   if ($config
+   $config_civi = CRM_Core_Config::singleton();
+   if ($config_civi
       ->userSystem
       ->is_drupal) {
-      if (function_exists("module_exists") && module_exists("auto_login_url")) {
+      if ( \Drupal::moduleHandler()->moduleExists("auto_login_url")) {
          $list_tokens = array();
-         $list_tokens['autologin.page_front'] = 'Autologin to front page :: Autologin';
-         $list_tokens['autologin.base_site'] = 'Site to connect to :: Autologin';
+         $list_tokens['aluc.page_front'] = 'Autologin to front page :: Autologin';
+         $list_tokens['aluc.base_site'] = 'Site to connect to :: Autologin';
 
-         $dsql = "SELECT cforms.nid, node.title FROM {webform_civicrm_forms} cforms
-        JOIN {node} node ON cforms.nid = node.nid AND node.status = 1 order by node.title";
+         $tokens['aluc'] =  $list_tokens;
+         $list_tokens = array();
 
-         $dq_result = db_query($dsql);
 
-         foreach ($dq_result as $record) {
-            $list_tokens["autologin.webform_$record->nid"] = "$record->title (nid: $record->nid) :: Autologin Webforms";
-            $list_tokens["autologin.submission_$record->nid"] = "Sub $record->title (nid: $record->nid) :: Autologin Webforms Submission";
+         if ($config->get('webforms')) {
+            $query = \Drupal::entityQuery('webform');
+            if ($config->get('webform_open') == TRUE) {
+               $query->condition('status', 'open');
+            }
+               // ->condition('category', '')
+            $webforms=$query->execute();
+            $b=\Drupal::entityTypeManager()->getStorage('webform');
+            $c=$b->loadMultiple($webforms);
 
+            foreach ($c as $webform) {
+               // $list_tokens["autologin.webform_" . urlencode($webform->url())] = $webform->get('title') . " :: Autologin Webforms";
+               $list_tokens["aluc_wf." . $webform->id()] = $webform->get('title') . " :: Autologin Webforms";
+            }
+            $tokens['aluc_wf']  = $list_tokens;
+            $list_tokens = array();
          }
-         $tokens['autologin'] = $list_tokens;
+
+
+         if ($config->get('webform_submission')) {
+            $webforms_sub = \Drupal::entityQuery('webform_submission')->execute();
+            // $b=\Drupal::entityTypeManager()->getStorage('webform_submission');
+            // $c=$b->loadMultiple($webforms_sub);
+
+            $open_only = $config->get('webform_submission_open');
+            foreach ($webforms_sub as $webform_sub) {
+               $wfr = \Drupal::entityTypeManager()->getStorage('webform_submission')
+                     ->load($webform_sub);
+                     // ->getWebform();
+               $a=\Drupal::entityTypeManager()->getStorage('webform_submission')
+                     ->load($webform_sub);
+               if ((($open_only) && $wfr->getWebform()->status()) || (! $open_only)) { //Webform opened ?
+                  $list_tokens["aluc_wfs." . $wfr->id()] = $wfr->getWebform()->get('title') . " :: Autologin Webforms Submission";
+               }
+            }
+            $tokens['aluc_wfs']  = $list_tokens;
+            $list_tokens = array();
+         }
+
+
+
+
+         if ($config->get('views')) {
+            $query = \Drupal::entityQuery('view');
+            $or_cond = $query->orConditionGroup();
+            if ($config->get('view_filter')) {
+               foreach ($config->get('view_tags') as $key) {
+                  $or_cond->condition('tag', $key, 'CONTAINS');
+               }
+               //   ->condition('tag', 'default')
+               $query->condition($or_cond);
+            }
+            $views=$query->execute();
+            $b=\Drupal::entityTypeManager()->getStorage('view');
+            $c=$b->loadMultiple($views);
+
+            foreach ($c as $view) {
+               foreach ($view->get('display') as $disp) {
+                  // $list_tokens["autologin.view_" . $view->get('id') . '$' . $disp['id']] = $view->get('label') . ":" . $disp['display_title'] . " :: Autologin View";
+                  if (isset($disp['display_options']['path'])) {
+                     $list_tokens["aluc_view." . $view->get('id') . '_S_E_P_' . $disp['id']] = $view->get('label') . ":" . $disp['display_title'] . " :: Autologin View";
+                  }
+               }
+            }
+            $tokens['aluc_view']  = $list_tokens;
+         }
+
+         // $tokens['autologin'] = $list_tokens;
       }
    }
 
 }
 
 function civicrm_autologin_civicrm_tokenValues(&$values, $cids, $job = null, $tokens = array() , $context = null) {
-   $debug = variable_get('civicrm_autolgin_debug', false);
+    $config = \Drupal::config('civicrm_autologin.settings');
+
+   $debug = $config->get('debug');
+
    if ($debug) {
-      watchdog('civicrm_autologin_tokenValues', 'values: @values, cids: @cids, tokens: @tokens, job: @job, context: @context', array(
+      \Drupal::logger('civicrm_autologin_tokenValues')->notice('values: @values, cids: @cids, tokens: @tokens, job: @job, context: @context', array(
          '@values' => print_r($values, true) ,
          '@cids' => print_r($cids, true) ,
          '@tokens' => print_r($tokens, true) ,
@@ -145,14 +218,16 @@ function civicrm_autologin_civicrm_tokenValues(&$values, $cids, $job = null, $to
       ));
    }
 
-   if (!empty($tokens['autologin'])) {
-      civicrm_initialize();
+   if (count(preg_grep('(aluc|username)', array_keys($tokens)))) {
+      $civicrm = \Drupal::service('civicrm');
       global $base_url;
       // base_url peut contenir un chemin, en particulier les batchs Civicrm
       $r = parse_url($base_url);
       // recontruit juste l'URL du site
       $site_url = $r['scheme'] . '://' . $r['host'] . (!empty($r['port']) ? ':'.$r['port'] : '');
-      $trace = variable_get('civicrm_autolgin_trace', false);
+
+      $trace = $config->get('civicrm_autolgin_trace');
+
 
       foreach ($cids as $cid) {
          $params = array(
@@ -160,93 +235,91 @@ function civicrm_autologin_civicrm_tokenValues(&$values, $cids, $job = null, $to
             'sequential' => 1,
             'contact_id' => $cid
          );
+         // TODO : Check error if duplicate e-email!!
          $result = civicrm_api('UFMatch', 'get', $params);
          if (!$result['is_error'] && isset($result['values'][0]['uf_id'])) {
-            $drupalinfo = user_load($result['values'][0]['uf_id']);
+            $drupalinfo = \Drupal::entityTypeManager()->getStorage('user')->load($result['values'][0]['uf_id']);
             if ($debug) {
-               watchdog('civicrm_autologin(0)', 'values: @values, cids: @cids, cid: @cid, tokens: @tokens, params: @params, result: @result, drupalinfo: @drupalinfo ', array(
+               \Drupal::logger('civicrm_autologin(0)')->notice('values: @values, cids: @cids, cid: @cid, tokens: @tokens, params: @params, result: @result, drupal id: @drupalinfo ', array(
                   '@values' => print_r($values, true) ,
                   '@cids' => print_r($cids, true) ,
                   '@cid' => print_r($cid, true) ,
                   '@tokens' => print_r($tokens, true) ,
                   '@params' => print_r($params, true) ,
                   '@result' => print_r($result, true) ,
-                  '@drupalinfo' => print_r($drupalinfo, true)
+                  '@drupalinfo' => $drupalinfo->id()
                ));
             }
-            foreach ($tokens['autologin'] as $tmp_key => $cur_token_raw) {
-               $url = '';
-               // CiviCRM is buggy here, if token is being used in CiviMail, we need to use the key
-               // as the token. Otherwise ( PDF Letter, one-off email, etc) we
-               // need to use the value.
-               // Thanks to  sgladstone for her comments in fancytoken code !!!
-               $cur_token = '';
-               if (is_numeric($tmp_key)) {
-                  $cur_token = $cur_token_raw;
-               }
-               else {
-                  // Its being used by CiviMail.
-                  $cur_token = $tmp_key;
-               }
-               $token_to_fill = 'autologin.' . $cur_token;
+            foreach (preg_grep('(aluc|username)', array_keys($tokens)) as $tok_key) {
+               foreach ($tokens[$tok_key] as $tmp_key => $cur_token_raw) {
+                  $url = '';
+                  // CiviCRM is buggy here, if token is being used in CiviMail, we need to use the key
+                  // as the token. Otherwise ( PDF Letter, one-off email, etc) we
+                  // need to use the value.
+                  // Thanks to  sgladstone for her comments in fancytoken code !!!
+                  $cur_token = '';
+                  if (is_numeric($tmp_key)) {
+                     $cur_token = $cur_token_raw;
+                  }
+                  else {
+                     // Its being used by CiviMail.
+                     $cur_token = $tmp_key;
+                  }
+                  if ($tok_key === "aluc_view") {
+                     list($view,$display)=explode('_S_E_P_', $tmp_key);
+                     $url = '/' . \Drupal::entityTypeManager()->getStorage('view')
+                     ->load(current(\Drupal::entityQuery('view')->condition('id', $view)->execute()))
+                     ->get('display')[$display]['display_options']['path'];
+                  }
+                  else if ($tok_key == 'aluc_wf') {
+                     $url = \Drupal::entityTypeManager()->getStorage('webform')
+                     ->load(current(\Drupal::entityQuery('webform')->condition('id', $tmp_key)->execute()))
+                     ->toUrl()->toString();
+                  }
+                  else if ($tok_key == 'aluc_wfs') {
+                     // $ssql = "SELECT sforms.sid FROM {webform_submissions} sforms where sforms.nid = $nid and
+                     //   sforms.uid = $drupalinfo->uid order by sid desc limit 1";
 
-               $token_array = explode('_', $cur_token);
-               if ($debug) {
-                  watchdog('civicrm_autologin(1)', 'values: @values, cid: @cid, cur_token_raw: @cur_token_raw, token_to_fill: @token_to_fill, tmp_key: @tmp_key', array(
-                     '@values' => print_r($values, true) ,
-                     '@cid' => print_r($cid, true) ,
-                     '@cur_token_raw' => print_r($cur_token_raw, true) ,
-                     '@token_to_fill' => print_r($token_to_fill, true) ,
-                     '@tmp_key' => print_r($tmp_key, true)
-                  ));
-               }
-
-               $nid = $token_array[1];
-               if ($nid == 'front') {
-                  $url = '/';
-               }
-               else if ($nid == 'site') {
-                  $values[$cid][$token_to_fill] = $site_url . '/';
-                  continue;
-               }
-               else if ($token_array[0] == 'webform') {
-                  $url = "node/$nid";
-               }
-               else if ($token_array[0] == 'submission') {
-                  $ssql = "SELECT sforms.sid FROM {webform_submissions} sforms where sforms.nid = $nid and 
-                     sforms.uid = $drupalinfo->uid order by sid desc limit 1";
-
-                  $sq_result = db_query($ssql);
-                  $sid = $sq_result->fetchField();
-                  $url = "node/$nid/submission/$sid/edit";
-                  if ($debug) {
-                     watchdog('civicrm_autologin_submission', 'sid: @sid, nid: @nid, ssql: @ssql', array(
-                        '@sid' => print_r($sid, true) ,
-                        '@nid' => print_r($nid, true) ,
-                        '@ssql' => print_r($ssql, true)
-                     ));
+                     // $sq_result = \Drupal::database()->query($ssql);
+                     // $sid = $sq_result->fetchField();
+                     // $url = "node/$nid/submission/$sid/edit";
+                     $url=\Drupal::entityTypeManager()->getStorage('webform_submission')
+                        ->load($tmp_key)->url();
+                  }
+                  else if ($tmp_key == 'page_front') {
+                     $url = '/';
+                  }
+                  else if ($tmp_key == 'base_site') {
+                     $values[$cid][$tok_key.'.'.$tmp_key] = $site_url . '/';
+                     continue;
+                  }
+                  else if ($tmp_key == 'drupal') {
+                     $values[$cid][$tok_key.'.'.$tmp_key] = $drupalinfo->getAccountName();
+                     continue;
+                  }
+                  else {
+                     // Unknonw token !!!
+                     continue;
                   }
 
-               }
-               else {
-                 // Unknonw token !!!
-                 continue;
-               }
+                  // $values[$cid][$tok_key.'.'.$tmp_key] = auto_login_url_create($drupalinfo->id(), $url, false);
+                  $alu_service = \Drupal::service('auto_login_url.create');
+                  $values[$cid][$tok_key.'.'.$tmp_key] = $alu_service->create($drupalinfo->id(), $url, false);
+                  $aa = $values[$cid][$tok_key.'.'.$tmp_key];
 
-               $values[$cid][$token_to_fill] = auto_login_url_create($drupalinfo->uid, $url, false);
+                  if ($config->get('civicrm_autolgin_absurl')) {
+                     $values[$cid][$tok_key.'.'.$tmp_key] = $site_url . '/' . $values[$cid][$tok_key.'.'.$tmp_key];
+                  }
 
-               if (variable_get('civicrm_autolgin_absurl')) {
-                  $values[$cid][$token_to_fill] = $site_url . '/' . $values[$cid][$token_to_fill];
-               }
 
-               if ($trace) {
-                  watchdog('civicrm_autologin', 'nid: @nid, cid: @cid, val: @val, url: @url, cur_token_raw: @cur_token_raw ', array(
-                     '@nid' => $nid,
-                     '@cid' => $cid,
-                     '@val' => $values[$cid][$token_to_fill],
-                     '@url' => $url,
-                     '@cur_token_raw' => $cur_token_raw
-                  ));
+                  if ($trace) {
+                     \Drupal::logger('civicrm_autologin')->notice(' cid: @cid, val: @val, url: @url, cur_token_raw: @cur_token_raw ', array(
+                        '@cid' => $cid,
+                        '@val' => $values[$cid][$tok_key.'.'.$tmp_key],
+                        '@url' => $url,
+                        '@cur_token_raw' => $cur_token_raw
+                     ));
+                  }
                }
             }
          }

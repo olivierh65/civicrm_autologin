@@ -1,0 +1,8 @@
+name: civicrm_autologin
+description: 'Auto_login_url tokens in Civicrm'
+core: 8.x
+core_version_requirement: ^8 || ^9
+package: 'Civicrm autologin'
+dependencies:
+  auto_login_url: 'drupal:auto_login_url'
+type: module

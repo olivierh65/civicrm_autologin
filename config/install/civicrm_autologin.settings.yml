@@ -1,0 +1,9 @@
+webforms: true
+webform_open: true
+webform_submission: false
+webform_submission_open: true
+views: false
+view_filter: false
+absurl: true
+trace: true
+debug: false

@@ -1,0 +1,38 @@
+civicrm_autologin.settings:
+  type: mapping
+  label: 'Civicrm Autologin settings'
+  mapping:
+    webforms:
+      type: boolean
+      label: 'Show Webforms'
+    webform_open:
+      type: boolean
+      label: 'Opened webform only'
+    webform_submission:
+      type: boolean
+      label: 'Show Webform submissions'
+    webform_submission_open:
+      type: boolean
+      label: 'Opened Webform submissions only'
+    views:
+      type: boolean
+      label: 'Show Views'
+    view_filter:
+      type: boolean
+      label: 'filter views by tag'
+    view_tags: 
+      type: sequence
+      class: '\Drupal\Core\Config\Schema\Sequence'
+      definition_class: '\Drupal\Core\TypedData\ListDataDefinition'
+      label: 'Views with these tags only'
+    absurl:
+      type: boolean
+      label: 'Use absolute URL'
+    trace:
+      type: boolean
+      label: 'Enable trace'
+    debug:
+      type: boolean
+      label: 'Enable debug'
+    _core:
+      type: _core_config_info
